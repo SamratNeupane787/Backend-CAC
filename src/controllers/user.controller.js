@@ -10,9 +10,10 @@ const generateAccessAndRefereshToken = async (userId) => {
 
     const accessToken = user.generateAccessToken();
     const refereshToken = user.generateRefreshToken();
-
     user.refereshToken = refereshToken;
     await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refereshToken };
   } catch (error) {
     throw new ApiError(
       500,
@@ -112,7 +113,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const { email, username, password } = req.body;
 
-  if (!username || !email) {
+  if (!username && !email) {
     throw new ApiError(400, "username or email is required");
   }
 
