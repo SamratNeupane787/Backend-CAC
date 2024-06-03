@@ -3,7 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloud } from "../utils/Cloudnary.js";
 import { ApiResponse } from "../utils/Apiresponse.js";
-
+import jwt from "jsonwebtoken";
 const generateAccessAndRefereshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -184,4 +184,49 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "Logged out successfully!"));
 });
 
-export { registerUser, loginUser, logoutUser };
+const refereshAccessToken = asyncHandler(async (req, res) => {
+  const incomingRefereshToken =
+    req.cookies.refereshToken || req.body.refereshToken;
+  if (!incomingRefereshToken) {
+    throw new ApiError(401, "Unauthorized request!");
+  }
+
+  try {
+    const decodedToken = jwt.verify(
+      incomingRefereshToken,
+      process.env.REFERESH_TOKEN_SECRET
+    );
+
+    const user = await User.findById(decodedToken?._id);
+    if (!user) {
+      throw new ApiError(401, "Invalid referesh Token");
+    }
+
+    if (incomingRefereshToken !== user?.refereshToken) {
+      throw new ApiError(401, "Referesh token is expired or used");
+    }
+
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+
+    const { accessToken, newrefereshToken } =
+      await generateAccessAndRefereshToken(user._id);
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken)
+      .cookie("refereshToken", newrefereshToken)
+      .json(
+        new ApiResponse(
+          200,
+          { accessToken, refereshToken: newrefereshToken },
+          "Access token refreshed"
+        )
+      );
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Invalid referesh token");
+  }
+});
+
+export { registerUser, loginUser, logoutUser, refereshAccessToken };
